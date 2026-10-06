@@ -1,0 +1,155 @@
+name: Gerar projeto Nexus
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Baixar projeto pronto
+        run: |
+          curl -L -o nexus.zip https://github.com/nexus-agent/nexus-agent/archive/refs/heads/main.zip || true
+          # fallback: gera os arquivos essenciais direto
+          mkdir -p src/agent/llm src/api_engine src/self_core src/exporter/formatters src/store src/db src/theme src/components src/screens src/navigation
+
+          cat > package.json <<'EOF'
+          {
+            "name": "nexus-agent",
+            "version": "1.0.0",
+            "main": "node_modules/expo/AppEntry.js",
+            "scripts": {
+              "start": "expo start --dev-client",
+              "android": "expo run:android",
+              "prebuild": "expo prebuild"
+            },
+            "dependencies": {
+              "@react-navigation/native": "^6.1.17",
+              "@react-navigation/native-stack": "^6.9.26",
+              "axios": "^1.7.2",
+              "expo": "~51.0.0",
+              "expo-crypto": "~13.0.2",
+              "expo-dev-client": "~4.0.20",
+              "expo-document-picker": "~12.0.2",
+              "expo-file-system": "~17.0.1",
+              "expo-print": "~13.0.1",
+              "expo-secure-store": "~13.0.2",
+              "expo-sharing": "~12.0.1",
+              "expo-sqlite": "~14.0.6",
+              "expo-status-bar": "~1.12.1",
+              "react": "18.2.0",
+              "react-native": "0.74.5",
+              "react-native-gesture-handler": "~2.16.1",
+              "react-native-safe-area-context": "4.10.5",
+              "react-native-screens": "3.31.1",
+              "zustand": "^4.5.4"
+            },
+            "devDependencies": {
+              "@babel/core": "^7.24.0",
+              "@types/react": "~18.2.79",
+              "babel-plugin-module-resolver": "^5.0.2",
+              "typescript": "~5.3.3"
+            },
+            "private": true
+          }
+          EOF
+
+          cat > app.json <<'EOF'
+          {
+            "expo": {
+              "name": "Nexus Agent",
+              "slug": "nexus-agent",
+              "version": "1.0.0",
+              "orientation": "portrait",
+              "userInterfaceStyle": "dark",
+              "scheme": "nexusagent",
+              "splash": { "backgroundColor": "#0B0F19" },
+              "ios": { "supportsTablet": true, "bundleIdentifier": "com.nexus.agent" },
+              "android": { "package": "com.nexus.agent" },
+              "plugins": ["expo-dev-client", "expo-secure-store", "expo-document-picker"]
+            }
+          }
+          EOF
+
+          cat > tsconfig.json <<'EOF'
+          {
+            "extends": "expo/tsconfig.base",
+            "compilerOptions": {
+              "strict": true,
+              "baseUrl": ".",
+              "paths": { "@/*": ["src/*"] },
+              "jsx": "react-native",
+              "resolveJsonModule": true,
+              "esModuleInterop": true,
+              "skipLibCheck": true
+            },
+            "include": ["**/*.ts", "**/*.tsx", "App.tsx"]
+          }
+          EOF
+
+          cat > babel.config.js <<'EOF'
+          module.exports = function (api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo'],
+              plugins: [['module-resolver', { alias: { '@': './src' } }]]
+            };
+          };
+          EOF
+
+          cat > metro.config.js <<'EOF'
+          const { getDefaultConfig } = require('expo/metro-config');
+          module.exports = getDefaultConfig(__dirname);
+          EOF
+
+          cat > eas.json <<'EOF'
+          {
+            "cli": { "version": ">= 5.0.0" },
+            "build": {
+              "preview": { "android": { "buildType": "apk" }, "distribution": "internal" },
+              "production": {}
+            }
+          }
+          EOF
+
+          cat > App.tsx <<'EOF'
+          import React from 'react';
+          import { StatusBar } from 'expo-status-bar';
+          import { SafeAreaProvider } from 'react-native-safe-area-context';
+          import { View, Text } from 'react-native';
+          export default function App() {
+            return (
+              <SafeAreaProvider>
+                <View style={{ flex: 1, backgroundColor: '#0B0F19', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#F5F7FF', fontSize: 28, fontWeight: '700' }}>Nexus Agent</Text>
+                  <Text style={{ color: '#A0A7BD', marginTop: 8 }}>App instalado com sucesso ✅</Text>
+                </View>
+                <StatusBar style="light" />
+              </SafeAreaProvider>
+            );
+          }
+          EOF
+
+          cat > .gitignore <<'EOF'
+          node_modules/
+          .expo/
+          dist/
+          .env
+          android/
+          ios/
+          *.log
+          EOF
+
+          echo "✅ Arquivos gerados"
+
+      - name: Commit
+        run: |
+          git config user.name "nexus-bot"
+          git config user.email "nexus-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: projeto base Nexus Agent" || echo "nada"
+          git push
