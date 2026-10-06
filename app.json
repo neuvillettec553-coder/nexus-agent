@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "Nexus Agent",
+    "slug": "nexus-agent",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "nexusagent",
+    "splash": { "backgroundColor": "#0B0F19" },
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.nexus.agent" },
+    "android": { "package": "com.nexus.agent" },
+    "plugins": ["expo-dev-client", "expo-secure-store", "expo-document-picker"]
+  }
+}
