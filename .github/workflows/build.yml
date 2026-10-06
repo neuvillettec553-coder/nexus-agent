@@ -1,0 +1,444 @@
+name: Gerar projeto Nexus Agent
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gerar arquivos do projeto
+        run: |
+          set -e
+          mkdir -p assets src/agent/llm src/api_engine src/self_core \
+                   src/exporter/formatters src/store src/db src/theme \
+                   src/components src/screens src/navigation
+
+          cat > package.json <<'EOF'
+          {
+            "name": "nexus-agent",
+            "version": "1.0.0",
+            "main": "node_modules/expo/AppEntry.js",
+            "scripts": {
+              "start": "expo start --dev-client",
+              "android": "expo run:android",
+              "ios": "expo run:ios",
+              "prebuild": "expo prebuild",
+              "typecheck": "tsc --noEmit"
+            },
+            "dependencies": {
+              "@react-navigation/bottom-tabs": "^6.5.20",
+              "@react-navigation/native": "^6.1.17",
+              "@react-navigation/native-stack": "^6.9.26",
+              "axios": "^1.7.2",
+              "expo": "~51.0.0",
+              "expo-crypto": "~13.0.2",
+              "expo-dev-client": "~4.0.20",
+              "expo-document-picker": "~12.0.2",
+              "expo-file-system": "~17.0.1",
+              "expo-print": "~13.0.1",
+              "expo-secure-store": "~13.0.2",
+              "expo-sharing": "~12.0.1",
+              "expo-sqlite": "~14.0.6",
+              "expo-status-bar": "~1.12.1",
+              "react": "18.2.0",
+              "react-native": "0.74.5",
+              "react-native-gesture-handler": "~2.16.1",
+              "react-native-safe-area-context": "4.10.5",
+              "react-native-screens": "3.31.1",
+              "zustand": "^4.5.4"
+            },
+            "devDependencies": {
+              "@babel/core": "^7.24.0",
+              "@types/react": "~18.2.79",
+              "babel-plugin-module-resolver": "^5.0.2",
+              "typescript": "~5.3.3"
+            },
+            "private": true
+          }
+          EOF
+
+          cat > .gitignore <<'EOF'
+          node_modules/
+          .expo/
+          dist/
+          web-build/
+          .env
+          .env.local
+          android/
+          ios/
+          *.log
+          .DS_Store
+          EOF
+
+          cat > .env.example <<'EOF'
+          EXPO_PUBLIC_LLM_PROVIDER=mock
+          EXPO_PUBLIC_OPENAI_API_KEY=
+          EXPO_PUBLIC_OPENAI_MODEL=gpt-4o-mini
+          EXPO_PUBLIC_OLLAMA_URL=http://localhost:11434
+          EXPO_PUBLIC_OLLAMA_MODEL=llama3
+          EOF
+
+          cat > tsconfig.json <<'EOF'
+          {
+            "extends": "expo/tsconfig.base",
+            "compilerOptions": {
+              "strict": true,
+              "baseUrl": ".",
+              "paths": { "@/*": ["src/*"] },
+              "jsx": "react-native",
+              "resolveJsonModule": true,
+              "esModuleInterop": true,
+              "skipLibCheck": true
+            },
+            "include": ["**/*.ts", "**/*.tsx", "App.tsx"]
+          }
+          EOF
+
+          cat > babel.config.js <<'EOF'
+          module.exports = function (api) {
+            api.cache(true);
+            return {
+              presets: ['babel-preset-expo'],
+              plugins: [['module-resolver', { alias: { '@': './src' } }]]
+            };
+          };
+          EOF
+
+          cat > metro.config.js <<'EOF'
+          const { getDefaultConfig } = require('expo/metro-config');
+          const config = getDefaultConfig(__dirname);
+          config.resolver.assetExts.push('json');
+          module.exports = config;
+          EOF
+
+          cat > app.json <<'EOF'
+          {
+            "expo": {
+              "name": "Nexus Agent",
+              "slug": "nexus-agent",
+              "version": "1.0.0",
+              "orientation": "portrait",
+              "userInterfaceStyle": "dark",
+              "scheme": "nexusagent",
+              "splash": { "backgroundColor": "#0B0F19" },
+              "ios": { "supportsTablet": true, "bundleIdentifier": "com.nexus.agent" },
+              "android": { "package": "com.nexus.agent" },
+              "plugins": ["expo-dev-client", "expo-secure-store", "expo-document-picker"]
+            }
+          }
+          EOF
+
+          cat > App.tsx <<'EOF'
+          import React from 'react';
+          import { StatusBar } from 'expo-status-bar';
+          import { GestureHandlerRootView } from 'react-native-gesture-handler';
+          import { SafeAreaProvider } from 'react-native-safe-area-context';
+          import { RootNavigator } from '@/navigation/RootNavigator';
+
+          export default function App() {
+            return (
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                  <StatusBar style="light" />
+                  <RootNavigator />
+                </SafeAreaProvider>
+              </GestureHandlerRootView>
+            );
+          }
+          EOF
+
+          # TEMA
+          cat > src/theme/colors.ts <<'EOF'
+          export const colors = {
+            background: '#0B0F19', surface: '#131826', surfaceElevated: '#1A2133',
+            border: '#232B3F', primary: '#6C5CE7', primarySoft: '#8A7BFF',
+            accent: '#00D2B4', danger: '#FF5C7A', warning: '#FFB86B',
+            textPrimary: '#F5F7FF', textSecondary: '#A0A7BD', textMuted: '#5F677E',
+            success: '#3DDC97', overlay: 'rgba(11,15,25,0.85)'
+          };
+          EOF
+
+          cat > src/theme/spacing.ts <<'EOF'
+          export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 };
+          export const radius = { sm: 8, md: 14, lg: 22, pill: 999 };
+          EOF
+
+          cat > src/theme/typography.ts <<'EOF'
+          import { Platform } from 'react-native';
+          export const typography = {
+            fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+            sizes: { caption: 12, body: 15, subtitle: 17, title: 22, hero: 30 },
+            weights: { regular: '400' as const, medium: '500' as const, semibold: '600' as const, bold: '700' as const }
+          };
+          EOF
+
+          # DB
+          cat > src/db/schema.ts <<'EOF'
+          export const SCHEMA = `
+          CREATE TABLE IF NOT EXISTS apis (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, baseUrl TEXT NOT NULL, type TEXT NOT NULL, schemaJson TEXT, headersJson TEXT, createdAt INTEGER NOT NULL);
+          CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, meta TEXT, createdAt INTEGER NOT NULL);
+          CREATE TABLE IF NOT EXISTS files (id TEXT PRIMARY KEY NOT NULL, name TEXT NOT NULL, mime TEXT NOT NULL, path TEXT NOT NULL, size INTEGER, createdAt INTEGER NOT NULL);
+          `;
+          EOF
+
+          cat > src/db/database.ts <<'EOF'
+          import * as SQLite from 'expo-sqlite';
+          import { SCHEMA } from './schema';
+          let db: SQLite.SQLiteDatabase | null = null;
+          export async function getDB(): Promise<SQLite.SQLiteDatabase> {
+            if (db) return db;
+            db = await SQLite.openDatabaseAsync('nexus_agent.db');
+            await db.execAsync(SCHEMA);
+            return db;
+          }
+          export async function runQuery<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+            const database = await getDB();
+            return database.getAllAsync<T>(sql, params);
+          }
+          export async function runExec(sql: string, params: any[] = []): Promise<void> {
+            const database = await getDB();
+            await database.runAsync(sql, params);
+          }
+          EOF
+
+          # STORES
+          cat > src/store/useApiStore.ts <<'EOF'
+          import { create } from 'zustand';
+          import { runExec, runQuery } from '@/db/database';
+          export type ApiType = 'REST' | 'GraphQL';
+          export interface ApiDefinition {
+            id: string; name: string; baseUrl: string; type: ApiType;
+            schemaJson?: string; headersJson?: string; createdAt: number;
+          }
+          interface ApiState {
+            apis: ApiDefinition[];
+            load: () => Promise<void>;
+            add: (api: ApiDefinition) => Promise<void>;
+            remove: (id: string) => Promise<void>;
+          }
+          export const useApiStore = create<ApiState>((set, get) => ({
+            apis: [],
+            load: async () => { set({ apis: await runQuery<ApiDefinition>('SELECT * FROM apis ORDER BY createdAt DESC') }); },
+            add: async (api) => {
+              await runExec('INSERT INTO apis (id,name,baseUrl,type,schemaJson,headersJson,createdAt) VALUES (?,?,?,?,?,?,?)',
+                [api.id, api.name, api.baseUrl, api.type, api.schemaJson ?? null, api.headersJson ?? null, api.createdAt]);
+              set({ apis: [api, ...get().apis] });
+            },
+            remove: async (id) => {
+              await runExec('DELETE FROM apis WHERE id = ?', [id]);
+              set({ apis: get().apis.filter(a => a.id !== id) });
+            }
+          }));
+          EOF
+
+          cat > src/store/useAgentStore.ts <<'EOF'
+          import { create } from 'zustand';
+          import { runExec, runQuery } from '@/db/database';
+          export interface ChatMessage {
+            id: string; role: 'user' | 'agent' | 'system';
+            content: string; meta?: string; createdAt: number;
+          }
+          interface AgentState {
+            messages: ChatMessage[]; thinking: boolean;
+            load: () => Promise<void>;
+            push: (msg: ChatMessage) => Promise<void>;
+            setThinking: (v: boolean) => void;
+            clear: () => Promise<void>;
+          }
+          export const useAgentStore = create<AgentState>((set, get) => ({
+            messages: [], thinking: false,
+            load: async () => { set({ messages: await runQuery<ChatMessage>('SELECT * FROM messages ORDER BY createdAt ASC LIMIT 200') }); },
+            push: async (msg) => {
+              await runExec('INSERT INTO messages (id,role,content,meta,createdAt) VALUES (?,?,?,?,?)',
+                [msg.id, msg.role, msg.content, msg.meta ?? null, msg.createdAt]);
+              set({ messages: [...get().messages, msg] });
+            },
+            setThinking: (v) => set({ thinking: v }),
+            clear: async () => { await runExec('DELETE FROM messages'); set({ messages: [] }); }
+          }));
+          EOF
+
+          cat > src/store/useFileStore.ts <<'EOF'
+          import { create } from 'zustand';
+          import { runExec, runQuery } from '@/db/database';
+          export interface ExportedFile {
+            id: string; name: string; mime: string; path: string;
+            size?: number; createdAt: number;
+          }
+          interface FileState {
+            files: ExportedFile[];
+            load: () => Promise<void>;
+            add: (f: ExportedFile) => Promise<void>;
+            remove: (id: string) => Promise<void>;
+          }
+          export const useFileStore = create<FileState>((set, get) => ({
+            files: [],
+            load: async () => { set({ files: await runQuery<ExportedFile>('SELECT * FROM files ORDER BY createdAt DESC') }); },
+            add: async (f) => {
+              await runExec('INSERT INTO files (id,name,mime,path,size,createdAt) VALUES (?,?,?,?,?,?)',
+                [f.id, f.name, f.mime, f.path, f.size ?? null, f.createdAt]);
+              set({ files: [f, ...get().files] });
+            },
+            remove: async (id) => {
+              await runExec('DELETE FROM files WHERE id = ?', [id]);
+              set({ files: get().files.filter(x => x.id !== id) });
+            }
+          }));
+          EOF
+
+          # AGENTE
+          cat > src/agent/prompts.ts <<'EOF'
+          export const SYSTEM_PROMPT = `Você é o Nexus Agent, um agente autônomo local embarcado em um app móvel.`;
+          export const PLANNER_PROMPT = `Dada a solicitação e as APIs disponíveis, produza JSON estrito:
+          { "intent": string, "steps": [ {"type":"api",...} | {"type":"file",...} | {"type":"code",...} | {"type":"answer","content":string} ] }
+          Passo API: {"type":"api","apiId":string,"method":string,"path":string,"body":object|null,"query":object|null}
+          Passo arquivo: {"type":"file","format":"json|csv|markdown|pdf","filename":string,"content":any}
+          Passo código: {"type":"code","description":string,"target":string}
+          Finalize sempre com {"type":"answer","content":string}.`;
+          EOF
+
+          cat > src/agent/llm/LLMProvider.ts <<'EOF'
+          export interface LLMMessage { role: 'system' | 'user' | 'assistant'; content: string; }
+          export interface LLMProvider { name: string; complete(messages: LLMMessage[]): Promise<string>; }
+          EOF
+
+          cat > src/agent/llm/OpenAIProvider.ts <<'EOF'
+          import axios from 'axios';
+          import { LLMMessage, LLMProvider } from './LLMProvider';
+          export class OpenAIProvider implements LLMProvider {
+            name = 'openai';
+            constructor(private apiKey: string, private model = 'gpt-4o-mini') {}
+            async complete(messages: LLMMessage[]): Promise<string> {
+              const res = await axios.post('https://api.openai.com/v1/chat/completions',
+                { model: this.model, messages, temperature: 0.3 },
+                { headers: { Authorization: `Bearer ${this.apiKey}` } });
+              return res.data.choices?.[0]?.message?.content ?? '';
+            }
+          }
+          EOF
+
+          cat > src/agent/llm/OllamaProvider.ts <<'EOF'
+          import axios from 'axios';
+          import { LLMMessage, LLMProvider } from './LLMProvider';
+          export class OllamaProvider implements LLMProvider {
+            name = 'ollama';
+            constructor(private baseUrl: string, private model = 'llama3') {}
+            async complete(messages: LLMMessage[]): Promise<string> {
+              const res = await axios.post(`${this.baseUrl}/api/chat`, { model: this.model, messages, stream: false });
+              return res.data?.message?.content ?? '';
+            }
+          }
+          EOF
+
+          cat > src/agent/llm/MockProvider.ts <<'EOF'
+          import { LLMMessage, LLMProvider } from './LLMProvider';
+          export class MockProvider implements LLMProvider {
+            name = 'mock';
+            async complete(messages: LLMMessage[]): Promise<string> {
+              const last = messages[messages.length - 1]?.content ?? '';
+              return JSON.stringify({ intent: 'answer', steps: [{ type: 'answer',
+                content: `[Mock] Recebi: "${last.slice(0, 120)}". Configure EXPO_PUBLIC_LLM_PROVIDER.` }] });
+            }
+          }
+          EOF
+
+          cat > src/agent/llm/factory.ts <<'EOF'
+          import { LLMProvider } from './LLMProvider';
+          import { OpenAIProvider } from './OpenAIProvider';
+          import { OllamaProvider } from './OllamaProvider';
+          import { MockProvider } from './MockProvider';
+          export function createLLM(): LLMProvider {
+            const p = process.env.EXPO_PUBLIC_LLM_PROVIDER ?? 'mock';
+            if (p === 'openai') {
+              const key = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? '';
+              if (key) return new OpenAIProvider(key, process.env.EXPO_PUBLIC_OPENAI_MODEL ?? 'gpt-4o-mini');
+            }
+            if (p === 'ollama') {
+              return new OllamaProvider(process.env.EXPO_PUBLIC_OLLAMA_URL ?? 'http://localhost:11434',
+                process.env.EXPO_PUBLIC_OLLAMA_MODEL ?? 'llama3');
+            }
+            return new MockProvider();
+          }
+          EOF
+
+          cat > src/agent/IntentParser.ts <<'EOF'
+          import { LLMProvider } from './llm/LLMProvider';
+          import { PLANNER_PROMPT } from './prompts';
+          export interface AgentStep { type: 'api' | 'file' | 'code' | 'answer'; [k: string]: any; }
+          export interface AgentPlan { intent: string; steps: AgentStep[]; }
+          export class IntentParser {
+            constructor(private llm: LLMProvider) {}
+            async parse(userMessage: string, apisContext: string): Promise<AgentPlan> {
+              const raw = await this.llm.complete([
+                { role: 'system', content: PLANNER_PROMPT },
+                { role: 'user', content: `APIs:\n${apisContext}\n\nSolicita\u00e7\u00e3o: ${userMessage}` }
+              ]);
+              try {
+                const s = raw.indexOf('{'); const e = raw.lastIndexOf('}');
+                const slice = s >= 0 && e > s ? raw.slice(s, e + 1) : raw;
+                const parsed = JSON.parse(slice);
+                if (!Array.isArray(parsed.steps)) throw new Error('steps');
+                return parsed;
+              } catch {
+                return { intent: 'answer', steps: [{ type: 'answer', content: raw }] };
+              }
+            }
+          }
+          EOF
+
+          cat > src/agent/Orchestrator.ts <<'EOF'
+          import { AgentPlan, AgentStep } from './IntentParser';
+          import { useApiStore } from '@/store/useApiStore';
+          import { DynamicRequestBuilder } from '@/api_engine/DynamicRequestBuilder';
+          import { ExportEngine } from '@/exporter/ExportEngine';
+          export interface StepResult { step: AgentStep; ok: boolean; output: any; }
+          export class Orchestrator {
+            constructor(private requester: DynamicRequestBuilder, private exporter: ExportEngine) {}
+            async run(plan: AgentPlan): Promise<StepResult[]> {
+              const out: StepResult[] = [];
+              for (const step of plan.steps) {
+                try { out.push({ step, ok: true, output: await this.execute(step) }); }
+                catch (e: any) { out.push({ step, ok: false, output: e?.message ?? String(e) }); }
+              }
+              return out;
+            }
+            private async execute(step: AgentStep): Promise<any> {
+              switch (step.type) {
+                case 'api': {
+                  const api = useApiStore.getState().apis.find(a => a.id === step.apiId);
+                  if (!api) throw new Error(`API ${step.apiId} n\u00e3o registrada`);
+                  return this.requester.buildAndSend(api, { method: step.method, path: step.path, body: step.body, query: step.query });
+                }
+                case 'file': return this.exporter.exportAndShare({ format: step.format, filename: step.filename, content: step.content });
+                case 'code': return { note: 'Extens\u00e3o registrada.', target: step.target };
+                default: return step.content;
+              }
+            }
+          }
+          EOF
+
+          cat > src/agent/AgentEngine.ts <<'EOF'
+          import { IntentParser } from './IntentParser';
+          import { Orchestrator, StepResult } from './Orchestrator';
+          import { LLMProvider } from './llm/LLMProvider';
+          import { useApiStore } from '@/store/useApiStore';
+          export interface AgentRunResult { plan: any; results: StepResult[]; summary: string; }
+          export class AgentEngine {
+            private parser: IntentParser;
+            constructor(llm: LLMProvider, private orchestrator: Orchestrator) { this.parser = new IntentParser(llm); }
+            async handle(userMessage: string): Promise<AgentRunResult> {
+              const apis = useApiStore.getState().apis;
+              const ctx = apis.map(a => `- id=${a.id} | ${a.name} | ${a.type} | ${a.baseUrl}`).join('\n');
+              const plan = await this.parser.parse(userMessage, ctx || '(nenhuma)');
+              const results = await this.orchestrator.run(plan);
+              const answer = results.find(r => r.step.type === 'answer');
+              const summary = (answer?.output as string) ??
+                `Executados ${results.length} passo(s). ${results.filter(r => r.ok).length} com sucesso.`;
+              return { plan, results, summary }
